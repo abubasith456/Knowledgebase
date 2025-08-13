@@ -1329,22 +1329,29 @@ app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
     import uvicorn
+    import os
     
-    print("=" * 60)
-    print("🌟 Starting Complete Knowledge Base System")
-    print("=" * 60)
-    print("📖 Gradio UI: http://localhost:7860")
-    print("🔗 API Docs: http://localhost:7860/docs")
-    print("🚀 Health Check: http://localhost:7860/api/health")
-    print("=" * 60)
-    print("🎯 Features Available:")
-    print("  • Document Upload & Processing")
-    print("  • Vector Search & Querying")
-    print("  • Document Management & Selection")
-    print("  • Bulk Operations & Deletion")
-    print("  • Vector Database Management")
-    print("  • Complete REST API")
-    print("=" * 60)
+    # Check if running on HF Spaces
+    is_hf_space = os.getenv("SPACE_ID") is not None
+    
+    if is_hf_space:
+        print("🚀 Running on Hugging Face Spaces")
+        # For HF Spaces, mount Gradio on root path with specific config
+        app = gr.mount_gradio_app(
+            app, 
+            demo, 
+            path="/",
+            root_path="/",
+            app_kwargs={"docs_url": "/api/docs", "redoc_url": "/api/redoc"}
+        )
+    else:
+        print("🚀 Running locally")
+        # For local development
+        app = gr.mount_gradio_app(app, demo, path="/")
+    
+    print("🌟 Starting Advanced Knowledge Base System")
+    print("📖 Gradio UI: Available on root path")
+    print("🔗 API Docs: /api/docs")
     
     uvicorn.run(
         app,
