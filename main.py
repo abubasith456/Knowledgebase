@@ -12,6 +12,7 @@ import datetime
 
 import gradio as gr
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -748,6 +749,31 @@ app.add_middleware(
 # API ENDPOINTS
 # ===========================
 
+def create_manifest():
+    """Create a basic PWA manifest to prevent 404 errors"""
+    manifest_content = {
+        "name": "Advanced Knowledge Base",
+        "short_name": "KB System", 
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#000000",
+        "icons": [
+            {
+                "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3ctext y='.9em' font-size='90'%3e📚%3c/text%3e%3c/svg%3e",
+                "sizes": "any",
+                "type": "image/svg+xml"
+            }
+        ]
+    }
+    return manifest_content
+
+@app.get("/manifest.json")
+async def get_manifest():
+    """Serve PWA manifest to prevent 404 errors"""
+    return JSONResponse(create_manifest())
+
+
 @app.post("/api/upload")
 async def upload_document(file: UploadFile = File(...)):
     """Upload and process document via API"""
@@ -1333,21 +1359,26 @@ if __name__ == "__main__":
     
     if is_hf_space:
         print("🚀 Running on Hugging Face Spaces")
-        # For HF Spaces, mount Gradio on root path with specific config
+        print(f"🔗 Space URL: https://abubasith86-knowledgebase.hf.space/")
+        
+        # Mount with clean configuration for HF Spaces
         app = gr.mount_gradio_app(
             app, 
             demo, 
             path="/",
-            app_kwargs={"docs_url": "/api/docs", "redoc_url": "/api/redoc"}
+            app_kwargs={
+                "docs_url": "/api/docs", 
+                "redoc_url": "/api/redoc"
+            }
         )
     else:
         print("🚀 Running locally")
-        # For local development
         app = gr.mount_gradio_app(app, demo, path="/")
     
     print("🌟 Starting Advanced Knowledge Base System")
     print("📖 Gradio UI: Available on root path")
     print("🔗 API Docs: /api/docs")
+    print("📝 Manifest: /manifest.json")
     
     uvicorn.run(
         app,
