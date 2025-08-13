@@ -1324,9 +1324,6 @@ with gr.Blocks(
 # APPLICATION STARTUP
 # ===========================
 
-# Mount Gradio app on FastAPI
-app = gr.mount_gradio_app(app, demo, path="/")
-
 if __name__ == "__main__":
     import uvicorn
     import os
@@ -1341,7 +1338,6 @@ if __name__ == "__main__":
             app, 
             demo, 
             path="/",
-            root_path="/frontend",
             app_kwargs={"docs_url": "/api/docs", "redoc_url": "/api/redoc"}
         )
     else:
