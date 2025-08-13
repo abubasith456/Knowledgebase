@@ -1341,7 +1341,7 @@ if __name__ == "__main__":
             app, 
             demo, 
             path="/",
-            root_path="/",
+            root_path="/frontend",
             app_kwargs={"docs_url": "/api/docs", "redoc_url": "/api/redoc"}
         )
     else:
