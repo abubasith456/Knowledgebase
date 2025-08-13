@@ -13,6 +13,7 @@ import gradio as gr
 from gradio.routes import mount_gradio_app
 from gradio.blocks import Blocks
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -638,6 +639,18 @@ async def query_documents(request: QueryRequest):
 async def get_stats():
     """Get collection statistics via API"""
     return kb_service.get_collection_stats()
+
+@app.get("/manifest.json")
+async def manifest():
+    return JSONResponse({
+    "name": "Knowledge Base",
+    "short_name": "KB",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#667eea",
+    "icons": []
+    })
 
 
 @app.get("/api/health")
