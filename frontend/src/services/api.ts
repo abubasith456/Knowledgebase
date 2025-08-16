@@ -17,17 +17,11 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for adding auth headers if needed
 api.interceptors.request.use(
-  (config) => {
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (config) => config,
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -36,17 +30,24 @@ api.interceptors.response.use(
   }
 );
 
-export const uploadDocument = async (file: File, indexingConfig: IndexingConfig = {}): Promise<UploadResponse> => {
+export const uploadDocument = async (file: File, indexingConfig?: Partial<IndexingConfig>): Promise<UploadResponse> => {
+  const config: IndexingConfig = {
+    mode: indexingConfig?.mode || 'auto',
+    embedding_model: indexingConfig?.embedding_model || 'jinaai/jina-embeddings-v3',
+    manual_chunk_size: indexingConfig?.manual_chunk_size ?? 1000,
+    manual_chunk_overlap: indexingConfig?.manual_chunk_overlap ?? 200,
+    auto_token_threshold: indexingConfig?.auto_token_threshold ?? 7000,
+  };
+
   const formData = new FormData();
   formData.append('file', file);
   
-  // Add indexing configuration as query parameters
   const params = new URLSearchParams();
-  params.append('indexing_mode', indexingConfig.mode || 'auto');
-  params.append('embedding_model', indexingConfig.embedding_model || 'jinaai/jina-embeddings-v3');
-  params.append('manual_chunk_size', (indexingConfig.manual_chunk_size || 1000).toString());
-  params.append('manual_chunk_overlap', (indexingConfig.manual_chunk_overlap || 200).toString());
-  params.append('auto_token_threshold', (indexingConfig.auto_token_threshold || 7000).toString());
+  params.append('indexing_mode', config.mode);
+  params.append('embedding_model', config.embedding_model);
+  params.append('manual_chunk_size', String(config.manual_chunk_size));
+  params.append('manual_chunk_overlap', String(config.manual_chunk_overlap));
+  params.append('auto_token_threshold', String(config.auto_token_threshold));
   
   const response = await api.post<UploadResponse>(`/api/upload?${params.toString()}`, formData, {
     headers: {

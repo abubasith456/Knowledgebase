@@ -215,5 +215,5 @@ export interface NavItem {
   name: string;
   icon: React.ComponentType<any>;
   description: string;
-  component: React.ReactNode;
+  component?: React.ReactNode;
 }
