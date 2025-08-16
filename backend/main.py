@@ -3,7 +3,7 @@ import hashlib
 import tempfile
 import threading
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from dataclasses import dataclass
 from pathlib import Path
 import uuid
@@ -62,7 +62,16 @@ class UploadResponse(BaseModel):
     needs_chunking: bool
     action: str
     message: str
+    indexing_mode: str
+    embedding_model: str
     error: str = None
+
+class IndexingConfig(BaseModel):
+    mode: Literal["auto", "manual"] = "auto"
+    embedding_model: Literal["jinaai/jina-embeddings-v3", "qwen3-0.6B"] = "jinaai/jina-embeddings-v3"
+    manual_chunk_size: int = 1000
+    manual_chunk_overlap: int = 200
+    auto_token_threshold: int = 7000
 
 # ===========================
 # DATA CLASSES
@@ -80,6 +89,9 @@ class ChunkMetadata:
     file_type: str = "unknown"
     upload_timestamp: str = ""
     file_size: int = 0
+    indexing_mode: str = "auto"
+    embedding_model: str = "jinaai/jina-embeddings-v3"
+    is_embedded: bool = True
     
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary with string values for ChromaDB"""
@@ -93,7 +105,10 @@ class ChunkMetadata:
             "total_chunks": str(self.total_chunks),
             "file_type": str(self.file_type),
             "upload_timestamp": str(self.upload_timestamp),
-            "file_size": str(self.file_size)
+            "file_size": str(self.file_size),
+            "indexing_mode": str(self.indexing_mode),
+            "embedding_model": str(self.embedding_model),
+            "is_embedded": str(self.is_embedded)
         }
 
 # ===========================
@@ -108,23 +123,15 @@ class CompleteKBService:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         vector_db_path: str = "./chroma_db",
+        auto_token_threshold: int = 7000,
     ):
         print(f"🔧 Initializing Complete KB Service...")
 
         # Initialize components
         self.doc_converter = DocumentConverter()
-        print(f"📥 Loading embedding model: {embedding_model_name}")
-
-        try:
-            self.embedding_model = SentenceTransformer(
-                embedding_model_name, trust_remote_code=True
-            )
-            self.embedding_model.max_seq_length = 8192
-        except Exception as e:
-            print(f"❌ Failed to load model: {str(e)}")
-            print("🔄 Using fallback model...")
-            self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
+        self.auto_token_threshold = auto_token_threshold
+        
+        # Initialize tokenizer
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
         # Configuration
@@ -136,7 +143,37 @@ class CompleteKBService:
         os.makedirs(vector_db_path, exist_ok=True)
         self.chroma_client = chromadb.PersistentClient(path=vector_db_path)
         self.collection = self._get_or_create_collection()
+        
+        # Initialize embedding models
+        self.embedding_models = {}
+        self._load_embedding_model(embedding_model_name)
+        
         print(f"✅ Complete KB Service initialized successfully!")
+
+    def _load_embedding_model(self, model_name: str):
+        """Load embedding model by name"""
+        if model_name in self.embedding_models:
+            return self.embedding_models[model_name]
+        
+        print(f"📥 Loading embedding model: {model_name}")
+        try:
+            if model_name == "jinaai/jina-embeddings-v3":
+                model = SentenceTransformer(model_name, trust_remote_code=True)
+                model.max_seq_length = 8192
+            elif model_name == "qwen3-0.6B":
+                model = SentenceTransformer(model_name, trust_remote_code=True)
+                model.max_seq_length = 8192
+            else:
+                raise ValueError(f"Unsupported embedding model: {model_name}")
+                
+            self.embedding_models[model_name] = model
+            return model
+        except Exception as e:
+            print(f"❌ Failed to load model {model_name}: {str(e)}")
+            print("🔄 Using fallback model...")
+            fallback_model = SentenceTransformer("all-MiniLM-L6-v2")
+            self.embedding_models[model_name] = fallback_model
+            return fallback_model
 
     def _get_or_create_collection(self):
         """Get or create ChromaDB collection"""
@@ -238,18 +275,20 @@ class CompleteKBService:
         except Exception as e:
             raise Exception(f"Failed to parse document {file_path}: {str(e)}")
 
-    def should_chunk(self, content: str) -> bool:
-        """Determine if content needs chunking"""
+    def should_chunk_auto(self, content: str) -> bool:
+        """Determine if content needs chunking in auto mode"""
         token_count = self.count_tokens(content)
-        return token_count > self.max_tokens
+        return token_count > self.auto_token_threshold
 
-    def create_chunks(
-        self, content: str, metadata: Dict[str, Any]
+    def create_chunks_auto(
+        self, content: str, metadata: Dict[str, Any], embedding_model: str
     ) -> List[Dict[str, Any]]:
-        """Create chunks from content"""
+        """Create chunks in auto mode based on token threshold"""
         timestamp = datetime.datetime.now().isoformat()
-
-        if not self.should_chunk(content):
+        token_count = self.count_tokens(content)
+        
+        # Check if content is below threshold
+        if token_count <= self.auto_token_threshold:
             chunk_id = f"{uuid.uuid4().hex[:10]}_0"
             return [
                 {
@@ -265,9 +304,36 @@ class CompleteKBService:
                         file_type=metadata.get("file_type", "unknown"),
                         upload_timestamp=timestamp,
                         file_size=metadata.get("file_size", 0),
+                        indexing_mode="auto",
+                        embedding_model=embedding_model,
+                        is_embedded=False,  # Skip embedding for small content
                     ).to_dict(),
                 }
             ]
+
+        # Content is above threshold, chunk and embed
+        return self._create_chunks_with_embedding(content, metadata, embedding_model, "auto")
+
+    def create_chunks_manual(
+        self, content: str, metadata: Dict[str, Any], chunk_size: int, chunk_overlap: int, embedding_model: str
+    ) -> List[Dict[str, Any]]:
+        """Create chunks in manual mode by character size"""
+        return self._create_chunks_with_embedding(
+            content, metadata, embedding_model, "manual", chunk_size, chunk_overlap
+        )
+
+    def _create_chunks_with_embedding(
+        self, content: str, metadata: Dict[str, Any], embedding_model: str, 
+        indexing_mode: str, chunk_size: int = None, chunk_overlap: int = None
+    ) -> List[Dict[str, Any]]:
+        """Create chunks with embedding (internal method)"""
+        timestamp = datetime.datetime.now().isoformat()
+        
+        # Use provided chunk size/overlap or defaults
+        if chunk_size is None:
+            chunk_size = self.chunk_size
+        if chunk_overlap is None:
+            chunk_overlap = self.chunk_overlap
 
         # Split into sentences
         sentences = self._split_into_sentences(content)
@@ -279,7 +345,7 @@ class CompleteKBService:
         for sentence in sentences:
             sentence_tokens = self.count_tokens(sentence)
 
-            if current_tokens + sentence_tokens > self.chunk_size and current_chunk:
+            if current_tokens + sentence_tokens > chunk_size and current_chunk:
                 chunk_content = " ".join(current_chunk)
                 chunk_id = f"{uuid.uuid4().hex[:10]}_{chunk_index}"
 
@@ -297,13 +363,16 @@ class CompleteKBService:
                             file_type=metadata.get("file_type", "unknown"),
                             upload_timestamp=timestamp,
                             file_size=metadata.get("file_size", 0),
+                            indexing_mode=indexing_mode,
+                            embedding_model=embedding_model,
+                            is_embedded=True,
                         ).to_dict(),
                     }
                 )
 
                 # Handle overlap
                 overlap_content = self._get_overlap_content(
-                    current_chunk, self.chunk_overlap
+                    current_chunk, chunk_overlap
                 )
                 current_chunk = overlap_content + [sentence]
                 current_tokens = self.count_tokens(" ".join(current_chunk))
@@ -331,6 +400,9 @@ class CompleteKBService:
                         file_type=metadata.get("file_type", "unknown"),
                         upload_timestamp=timestamp,
                         file_size=metadata.get("file_size", 0),
+                        indexing_mode=indexing_mode,
+                        embedding_model=embedding_model,
+                        is_embedded=True,
                     ).to_dict(),
                 }
             )
@@ -367,41 +439,96 @@ class CompleteKBService:
 
         return overlap_content
 
-    def generate_embeddings(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Generate embeddings using Jina model"""
-        contents = [chunk["content"] for chunk in chunks]
-        embeddings = self.embedding_model.encode(contents, convert_to_numpy=True)
+    def generate_embeddings(self, chunks: List[Dict[str, Any]], embedding_model: str) -> List[Dict[str, Any]]:
+        """Generate embeddings using specified model"""
+        # Filter chunks that need embedding
+        chunks_to_embed = [chunk for chunk in chunks if chunk["metadata"].get("is_embedded", "True") == "True"]
+        
+        if not chunks_to_embed:
+            return chunks  # No chunks need embedding
+        
+        # Load model if not already loaded
+        model = self._load_embedding_model(embedding_model)
+        
+        contents = [chunk["content"] for chunk in chunks_to_embed]
+        embeddings = model.encode(contents, convert_to_numpy=True)
 
+        # Update chunks with embeddings
+        embed_index = 0
         for i, chunk in enumerate(chunks):
-            chunk["embedding"] = embeddings[i].tolist()
+            if chunk["metadata"].get("is_embedded", "True") == "True":
+                chunk["embedding"] = embeddings[embed_index].tolist()
+                embed_index += 1
 
         return chunks
 
     def store_in_vector_db(self, chunks_with_embeddings: List[Dict[str, Any]]) -> bool:
         """Store in ChromaDB"""
         try:
-            ids = [chunk["metadata"]["chunk_id"] for chunk in chunks_with_embeddings]
-            documents = [chunk["content"] for chunk in chunks_with_embeddings]
-            embeddings = [chunk["embedding"] for chunk in chunks_with_embeddings]
-
-            # Ensure all metadata values are strings and non-None
-            metadatas = []
+            # Separate embedded and non-embedded chunks
+            embedded_chunks = []
+            non_embedded_chunks = []
+            
             for chunk in chunks_with_embeddings:
-                clean_metadata = {}
-                for key, value in chunk["metadata"].items():
-                    if value is not None:
-                        clean_metadata[key] = str(value)
-                    else:
-                        clean_metadata[key] = (
-                            "0"
-                            if key in ["page_number", "chunk_index", "total_chunks"]
-                            else "unknown"
-                        )
-                metadatas.append(clean_metadata)
+                if chunk["metadata"].get("is_embedded", "True") == "True" and "embedding" in chunk:
+                    embedded_chunks.append(chunk)
+                else:
+                    non_embedded_chunks.append(chunk)
+            
+            # Store embedded chunks in vector DB
+            if embedded_chunks:
+                ids = [chunk["metadata"]["chunk_id"] for chunk in embedded_chunks]
+                documents = [chunk["content"] for chunk in embedded_chunks]
+                embeddings = [chunk["embedding"] for chunk in embedded_chunks]
 
-            self.collection.add(
-                ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas
-            )
+                # Ensure all metadata values are strings and non-None
+                metadatas = []
+                for chunk in embedded_chunks:
+                    clean_metadata = {}
+                    for key, value in chunk["metadata"].items():
+                        if value is not None:
+                            clean_metadata[key] = str(value)
+                        else:
+                            clean_metadata[key] = (
+                                "0"
+                                if key in ["page_number", "chunk_index", "total_chunks"]
+                                else "unknown"
+                            )
+                    metadatas.append(clean_metadata)
+
+                self.collection.add(
+                    ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas
+                )
+            
+            # Store non-embedded chunks as raw content (no embeddings)
+            if non_embedded_chunks:
+                ids = [chunk["metadata"]["chunk_id"] for chunk in non_embedded_chunks]
+                documents = [chunk["content"] for chunk in non_embedded_chunks]
+                
+                # Create zero embeddings for non-embedded chunks
+                embedding_dim = 768  # Default dimension, will be adjusted by model
+                if embedded_chunks and "embedding" in embedded_chunks[0]:
+                    embedding_dim = len(embedded_chunks[0]["embedding"])
+                
+                zero_embeddings = [[0.0] * embedding_dim for _ in non_embedded_chunks]
+
+                metadatas = []
+                for chunk in non_embedded_chunks:
+                    clean_metadata = {}
+                    for key, value in chunk["metadata"].items():
+                        if value is not None:
+                            clean_metadata[key] = str(value)
+                        else:
+                            clean_metadata[key] = (
+                                "0"
+                                if key in ["page_number", "chunk_index", "total_chunks"]
+                                else "unknown"
+                            )
+                    metadatas.append(clean_metadata)
+
+                self.collection.add(
+                    ids=ids, documents=documents, embeddings=zero_embeddings, metadatas=metadatas
+                )
 
             return True
         except Exception as e:
@@ -409,9 +536,9 @@ class CompleteKBService:
             return False
 
     def process_document(
-        self, file_path: str, replace_existing: bool = True
+        self, file_path: str, indexing_config: IndexingConfig, replace_existing: bool = True
     ) -> Dict[str, Any]:
-        """Complete pipeline with document replacement support"""
+        """Complete pipeline with indexing mode support"""
         try:
             # Step 1: Parse document
             print(f"📄 Parsing document: {Path(file_path).name}")
@@ -442,16 +569,33 @@ class CompleteKBService:
                     "action": "skipped",
                 }
 
-            # Step 3: Process new document
+            # Step 3: Process document based on indexing mode
             token_count = self.count_tokens(content)
-            needs_chunking = self.should_chunk(content)
+            
+            if indexing_config.mode == "auto":
+                print(f"🤖 Auto mode: {token_count} tokens (threshold: {self.auto_token_threshold})")
+                needs_chunking = self.should_chunk_auto(content)
+                chunks = self.create_chunks_auto(content, metadata, indexing_config.embedding_model)
+            else:  # manual mode
+                print(f"🔧 Manual mode: chunking by {indexing_config.manual_chunk_size} chars")
+                needs_chunking = True
+                chunks = self.create_chunks_manual(
+                    content, metadata, 
+                    indexing_config.manual_chunk_size, 
+                    indexing_config.manual_chunk_overlap,
+                    indexing_config.embedding_model
+                )
 
-            chunks = self.create_chunks(content, metadata)
-            print(f"📝 Created {len(chunks)} new chunks")
+            print(f"📝 Created {len(chunks)} chunks")
 
-            # Step 4: Generate embeddings
-            print("🧮 Generating embeddings...")
-            chunks_with_embeddings = self.generate_embeddings(chunks)
+            # Step 4: Generate embeddings (only for chunks that need it)
+            embedded_chunks = [chunk for chunk in chunks if chunk["metadata"].get("is_embedded", "True") == "True"]
+            if embedded_chunks:
+                print(f"🧮 Generating embeddings for {len(embedded_chunks)} chunks...")
+                chunks_with_embeddings = self.generate_embeddings(chunks, indexing_config.embedding_model)
+            else:
+                print("⏭️ Skipping embeddings (content below threshold)")
+                chunks_with_embeddings = chunks
 
             # Step 5: Store in vector DB
             print("💾 Storing in vector database...")
@@ -467,7 +611,9 @@ class CompleteKBService:
                 "chunks_deleted": deleted_chunks,
                 "needs_chunking": needs_chunking,
                 "action": action,
-                "message": f"Successfully {action} '{filename}' with {len(chunks)} chunks"
+                "indexing_mode": indexing_config.mode,
+                "embedding_model": indexing_config.embedding_model,
+                "message": f"Successfully {action} '{filename}' with {len(chunks)} chunks using {indexing_config.mode} mode and {indexing_config.embedding_model}"
                 + (
                     f" (removed {deleted_chunks} old chunks)"
                     if deleted_chunks > 0
@@ -485,7 +631,14 @@ class CompleteKBService:
     def query_knowledge_base(self, query: str, n_results: int = 5, document_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """Query the knowledge base with optional document filtering"""
         try:
-            query_embedding = self.embedding_model.encode([query])
+            # Use the first available embedding model for querying
+            if not self.embedding_models:
+                return {"success": False, "error": "No embedding models available", "query": query}
+            
+            model_name = list(self.embedding_models.keys())[0]
+            model = self.embedding_models[model_name]
+            
+            query_embedding = model.encode([query])
             
             # Build where clause for document filtering
             where_clause = None
@@ -550,8 +703,18 @@ class CompleteKBService:
                         "document_hash": metadata.get("document_hash", "unknown"),
                         "document_id": metadata.get("document_id", "unknown"),
                         "file_size": int(metadata.get("file_size", 0)),
+                        "indexing_mode": metadata.get("indexing_mode", "auto"),
+                        "embedding_model": metadata.get("embedding_model", "unknown"),
+                        "embedded_chunks": 0,
+                        "raw_chunks": 0,
                     }
                 doc_info[source]["chunks"] += 1
+                
+                # Count embedded vs raw chunks
+                if metadata.get("is_embedded", "True") == "True":
+                    doc_info[source]["embedded_chunks"] += 1
+                else:
+                    doc_info[source]["raw_chunks"] += 1
 
             return list(doc_info.values())
         except Exception as e:
@@ -620,8 +783,15 @@ app.add_middleware(
 # ===========================
 
 @app.post("/api/upload", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)):
-    """Upload and process document via API"""
+async def upload_document(
+    file: UploadFile = File(...),
+    indexing_mode: str = Query("auto", description="Indexing mode: 'auto' or 'manual'"),
+    embedding_model: str = Query("jinaai/jina-embeddings-v3", description="Embedding model: 'jinaai/jina-embeddings-v3' or 'qwen3-0.6B'"),
+    manual_chunk_size: int = Query(1000, description="Manual chunk size (characters)"),
+    manual_chunk_overlap: int = Query(200, description="Manual chunk overlap (characters)"),
+    auto_token_threshold: int = Query(7000, description="Auto mode token threshold"),
+):
+    """Upload and process document via API with indexing mode selection"""
     try:
         # Validate file type
         allowed_extensions = {".pdf", ".docx", ".doc", ".txt", ".md"}
@@ -631,6 +801,27 @@ async def upload_document(file: UploadFile = File(...)):
             raise HTTPException(
                 status_code=400, detail=f"Unsupported file type: {file_extension}"
             )
+
+        # Validate indexing mode
+        if indexing_mode not in ["auto", "manual"]:
+            raise HTTPException(
+                status_code=400, detail="Indexing mode must be 'auto' or 'manual'"
+            )
+
+        # Validate embedding model
+        if embedding_model not in ["jinaai/jina-embeddings-v3", "qwen3-0.6B"]:
+            raise HTTPException(
+                status_code=400, detail="Embedding model must be 'jinaai/jina-embeddings-v3' or 'qwen3-0.6B'"
+            )
+
+        # Create indexing config
+        indexing_config = IndexingConfig(
+            mode=indexing_mode,
+            embedding_model=embedding_model,
+            manual_chunk_size=manual_chunk_size,
+            manual_chunk_overlap=manual_chunk_overlap,
+            auto_token_threshold=auto_token_threshold
+        )
 
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(
@@ -642,7 +833,7 @@ async def upload_document(file: UploadFile = File(...)):
 
         try:
             # Process document
-            result = kb_service.process_document(temp_file_path)
+            result = kb_service.process_document(temp_file_path, indexing_config)
             return UploadResponse(**result)
         finally:
             # Clean up temp file

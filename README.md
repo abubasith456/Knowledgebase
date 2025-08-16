@@ -6,6 +6,8 @@ A modern, full-stack knowledge base system with AI-powered document processing a
 
 - **Document Processing**: Upload and process PDF, DOCX, DOC, TXT, and MD files
 - **AI-Powered Search**: Semantic search using Jina embeddings and vector similarity
+- **Smart Indexing**: Auto and Manual indexing modes with intelligent token detection
+- **Multiple Embedding Models**: Support for Jina Embeddings v3 and Qwen3 0.6B
 - **Modern UI**: Beautiful React frontend with Tailwind CSS
 - **REST API**: Complete FastAPI backend with automatic documentation
 - **Document Management**: View, manage, and delete uploaded documents
@@ -116,14 +118,55 @@ Create a `.env` file in the `frontend/` directory:
 REACT_APP_API_URL=http://localhost:8000
 ```
 
+## 🧠 Indexing Modes
+
+### Auto Mode (Default)
+- **Smart Token Detection**: Automatically detects if content needs chunking
+- **Token Threshold**: 7,000 tokens (configurable)
+- **Behavior**: 
+  - If content < threshold: Store as raw text (no embedding)
+  - If content ≥ threshold: Chunk and embed
+- **Benefits**: Optimizes storage and processing for small documents
+
+### Manual Mode
+- **Character-based Chunking**: Manual control over chunk size and overlap
+- **Configurable Parameters**:
+  - Chunk Size: 1,000 characters (default)
+  - Chunk Overlap: 200 characters (default)
+- **Benefits**: Precise control for specific use cases
+
+## 🤖 Embedding Models
+
+### Supported Models
+
+1. **Jina Embeddings v3** (Default)
+   - High-quality embeddings
+   - 8K context window
+   - Optimized for semantic search
+
+2. **Qwen3 0.6B**
+   - Lightweight model
+   - Fast processing
+   - Good for resource-constrained environments
+
+### Model Selection
+- Choose during document upload
+- Different models can be used for different documents
+- Automatic fallback to default model if loading fails
+
 ## 📖 Usage
 
 ### 1. Upload Documents
 
 1. Navigate to the "Upload Documents" tab
-2. Drag and drop files or click to select
-3. Supported formats: PDF, DOCX, DOC, TXT, MD
-4. View upload progress and results
+2. Configure indexing settings (optional):
+   - **Indexing Mode**: Auto or Manual
+   - **Embedding Model**: Jina v3 or Qwen3 0.6B
+   - **Token Threshold**: For auto mode (1,000-10,000)
+   - **Chunk Size/Overlap**: For manual mode
+3. Drag and drop files or click to select
+4. Supported formats: PDF, DOCX, DOC, TXT, MD
+5. View upload progress and results
 
 ### 2. Search Knowledge Base
 
@@ -137,14 +180,17 @@ REACT_APP_API_URL=http://localhost:8000
 
 1. Visit the "Manage Documents" tab
 2. View all uploaded documents and statistics
-3. Select documents for bulk operations
-4. Delete documents as needed
+3. See indexing mode and embedding model for each document
+4. View embedded vs raw chunk counts
+5. Select documents for bulk operations
+6. Delete documents as needed
 
 ## 🔌 API Endpoints
 
 ### Document Management
 
 - `POST /api/upload` - Upload and process documents
+  - Query params: `indexing_mode`, `embedding_model`, `manual_chunk_size`, `manual_chunk_overlap`, `auto_token_threshold`
 - `GET /api/documents` - List all documents
 - `DELETE /api/documents` - Delete documents by IDs
 
@@ -162,11 +208,18 @@ Visit http://localhost:8000/docs for interactive API documentation.
 
 ### Modern UI Components
 
-- **FileUpload**: Drag-and-drop interface with progress indicators
+- **FileUpload**: Drag-and-drop interface with advanced indexing options
 - **QueryInterface**: Advanced search with document filtering
-- **DocumentManager**: Comprehensive document management
+- **DocumentManager**: Comprehensive document management with indexing info
 - **Toast Notifications**: User-friendly feedback
 - **Responsive Design**: Mobile-first approach
+
+### Indexing Configuration
+
+- **Auto Mode**: Smart token detection with configurable threshold
+- **Manual Mode**: Character-based chunking with overlap
+- **Model Selection**: Choose between Jina v3 and Qwen3 0.6B
+- **Real-time Preview**: See current configuration before upload
 
 ### Styling
 
@@ -185,6 +238,7 @@ This project has been migrated from a single Gradio application to a separated a
 - **Frontend**: Replaced Gradio UI with React + Tailwind CSS
 - **API**: Clean REST API endpoints
 - **UI/UX**: Modern, responsive interface
+- **Indexing**: Added smart indexing modes and model selection
 
 ### Benefits
 
@@ -193,6 +247,7 @@ This project has been migrated from a single Gradio application to a separated a
 - **Scalability**: Independent scaling of frontend and backend
 - **Maintainability**: Clear separation of concerns
 - **Developer Experience**: Better debugging and development tools
+- **Flexibility**: Multiple indexing modes and embedding models
 
 ## 🛠️ Development
 
@@ -265,6 +320,7 @@ This project is licensed under the MIT License.
 - **Tailwind CSS**: Utility-first CSS framework
 - **ChromaDB**: Vector database
 - **Jina AI**: Embedding models
+- **Qwen**: Alternative embedding model
 
 ## 📞 Support
 

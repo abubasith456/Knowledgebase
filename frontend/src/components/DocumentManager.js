@@ -8,7 +8,9 @@ import {
   Download, 
   AlertTriangle,
   CheckCircle,
-  Loader
+  Loader,
+  Brain,
+  Zap
 } from 'lucide-react';
 import { listDocuments, deleteDocuments, getStats } from '../api';
 import toast from 'react-hot-toast';
@@ -141,6 +143,34 @@ const DocumentManager = ({ onDocumentDeleted }) => {
     }
   };
 
+  const getIndexingModeBadge = (mode) => {
+    const isAuto = mode === 'auto';
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+        isAuto 
+          ? 'bg-blue-100 text-blue-800' 
+          : 'bg-purple-100 text-purple-800'
+      }`}>
+        <Brain className="h-3 w-3 mr-1" />
+        {isAuto ? 'Auto' : 'Manual'}
+      </span>
+    );
+  };
+
+  const getEmbeddingModelBadge = (model) => {
+    const isJina = model.includes('jina');
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+        isJina 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-orange-100 text-orange-800'
+      }`}>
+        <Zap className="h-3 w-3 mr-1" />
+        {model.split('/').pop()}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="card">
@@ -156,7 +186,7 @@ const DocumentManager = ({ onDocumentDeleted }) => {
     <div className="space-y-6">
       {/* Statistics */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="card">
             <div className="flex items-center">
               <div className="p-2 bg-primary-100 rounded-lg">
@@ -184,11 +214,27 @@ const DocumentManager = ({ onDocumentDeleted }) => {
           <div className="card">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-blue-600" />
+                <Brain className="h-6 w-6 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Status</p>
-                <p className="text-2xl font-bold text-gray-900">Active</p>
+                <p className="text-sm font-medium text-gray-600">Embedded</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {documents.reduce((sum, doc) => sum + (doc.embedded_chunks || 0), 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="flex items-center">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Raw Content</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {documents.reduce((sum, doc) => sum + (doc.raw_chunks || 0), 0)}
+                </p>
               </div>
             </div>
           </div>
@@ -272,6 +318,9 @@ const DocumentManager = ({ onDocumentDeleted }) => {
                       Chunks
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Indexing
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Size
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -313,8 +362,19 @@ const DocumentManager = ({ onDocumentDeleted }) => {
                           {doc.file_type.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {doc.chunks}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          <div className="font-medium">{doc.chunks} total</div>
+                          <div className="text-xs text-gray-500">
+                            {doc.embedded_chunks || 0} embedded, {doc.raw_chunks || 0} raw
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="space-y-1">
+                          {getIndexingModeBadge(doc.indexing_mode || 'auto')}
+                          {getEmbeddingModelBadge(doc.embedding_model || 'unknown')}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatFileSize(doc.file_size)}

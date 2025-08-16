@@ -28,11 +28,19 @@ api.interceptors.response.use(
   }
 );
 
-export const uploadDocument = async (file) => {
+export const uploadDocument = async (file, indexingConfig = {}) => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/api/upload', formData, {
+  // Add indexing configuration as query parameters
+  const params = new URLSearchParams();
+  params.append('indexing_mode', indexingConfig.mode || 'auto');
+  params.append('embedding_model', indexingConfig.embedding_model || 'jinaai/jina-embeddings-v3');
+  params.append('manual_chunk_size', indexingConfig.manual_chunk_size || 1000);
+  params.append('manual_chunk_overlap', indexingConfig.manual_chunk_overlap || 200);
+  params.append('auto_token_threshold', indexingConfig.auto_token_threshold || 7000);
+  
+  const response = await api.post(`/api/upload?${params.toString()}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
