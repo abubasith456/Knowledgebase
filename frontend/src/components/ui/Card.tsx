@@ -25,10 +25,8 @@ const Card: React.FC<CardProps> = ({
     className
   );
 
-  const MotionComponent = onClick ? motion.div : motion.div;
-
   return (
-    <MotionComponent
+    <motion.div
       className={classes}
       onClick={onClick}
       whileHover={onClick ? { scale: 1.02, y: -2 } : undefined}
@@ -39,7 +37,7 @@ const Card: React.FC<CardProps> = ({
       {...props}
     >
       {children}
-    </MotionComponent>
+    </motion.div>
   );
 };
 

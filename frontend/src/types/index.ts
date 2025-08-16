@@ -101,6 +101,7 @@ export interface UIState {
   showAdvancedOptions: boolean;
   selectedDocuments: string[];
   refreshTrigger: number;
+  sidebarOpen: boolean;
 }
 
 // App Context Types
@@ -130,6 +131,7 @@ export interface AppContextType {
   toggleDocumentSelection: (documentId: string) => void;
   selectAllDocuments: () => void;
   clearDocumentSelection: () => void;
+  toggleSidebar: () => void;
 }
 
 // Component Props Types
@@ -144,6 +146,11 @@ export interface QueryInterfaceProps {
 
 export interface DocumentManagerProps {
   onDocumentDeleted?: (result: DeleteResponse) => void;
+}
+
+export interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export interface ModalProps {
@@ -200,4 +207,13 @@ export interface AppSettings {
   refreshInterval: number;
   maxUploadSize: number;
   defaultIndexingConfig: IndexingConfig;
+}
+
+// Navigation Types
+export interface NavItem {
+  id: string;
+  name: string;
+  icon: React.ComponentType<any>;
+  description: string;
+  component: React.ReactNode;
 }

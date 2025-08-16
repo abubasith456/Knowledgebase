@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-slate-200;
+  }
+  
   body {
     @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900 font-sans antialiased;
     background-attachment: fixed;
@@ -253,6 +257,27 @@
 
   .toast-info {
     @apply bg-primary-500 text-white border-primary-600;
+  }
+
+  /* Sidebar Styles */
+  .sidebar {
+    @apply fixed left-0 top-0 h-full w-64 bg-white/80 backdrop-blur-md border-r border-white/20 shadow-soft z-40 transition-transform duration-300;
+  }
+
+  .sidebar-collapsed {
+    @apply -translate-x-full;
+  }
+
+  .sidebar-overlay {
+    @apply fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden;
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-primary-50/50 rounded-xl transition-all duration-200;
+  }
+
+  .sidebar-nav-item-active {
+    @apply sidebar-nav-item text-primary-600 bg-primary-50/50 border-r-2 border-primary-500;
   }
 }
 
