@@ -6,10 +6,6 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  
   body {
     @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900 font-sans antialiased;
     background-attachment: fixed;

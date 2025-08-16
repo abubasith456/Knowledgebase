@@ -5,7 +5,6 @@ import {
   Upload, 
   Search, 
   FileText, 
-  Settings, 
   Brain,
   Github,
   ExternalLink,
@@ -18,7 +17,6 @@ import FileUpload from './components/FileUpload';
 import QueryInterface from './components/QueryInterface';
 import DocumentManager from './components/DocumentManager';
 import Button from './components/ui/Button';
-import Card from './components/ui/Card';
 import Badge from './components/ui/Badge';
 
 const AppContent: React.FC = () => {
@@ -44,7 +42,7 @@ const AppContent: React.FC = () => {
       name: 'Manage Documents',
       icon: FileText,
       description: 'View and manage your documents',
-      component: <DocumentManager />,
+      component: <DocumentManager onDocumentDeleted={() => {}} />,
     },
   ];
 
