@@ -48,7 +48,7 @@ export const uploadDocument = async (file, indexingConfig = {}) => {
   return response.data;
 };
 
-export const queryKnowledgeBase = async (query, nResults = 5, documentIds = null) => {
+export const queryKnowledgeBase = async (query, nResults = 5, documentIds = undefined) => {
   const response = await api.post('/api/query', {
     query,
     n_results: nResults,

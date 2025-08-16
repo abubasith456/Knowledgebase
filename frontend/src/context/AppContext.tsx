@@ -218,7 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setUIState({ isSearching: true });
       
-      const result = await queryKnowledgeBase(query, nResults, documentIds || undefined);
+      const result = await queryKnowledgeBase(query, nResults, documentIds);
       
       if (result.success) {
         const searchResults: SearchResult[] = result.results.documents[0].map((document: string, index: number) => {
