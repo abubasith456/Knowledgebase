@@ -10,7 +10,6 @@ import {
   BarChart3,
   Settings,
   Sparkles,
-  Zap,
   Database,
   ExternalLink,
   Github
@@ -79,28 +78,24 @@ const App: React.FC = () => {
             boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.15)',
           },
           success: {
-            iconTheme: {
-              primary: '#22c55e',
-              secondary: '#fff',
-            },
+            iconTheme: { primary: '#22c55e', secondary: '#fff' },
           },
           error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
+            iconTheme: { primary: '#ef4444', secondary: '#fff' },
           },
         }}
       />
 
       {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        onNavigate={(id) => setActiveTab(id)}
+        activeId={activeTab}
+      />
 
       {/* Main Content */}
-      <div className={cn(
-        'transition-all duration-300',
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
-      )}>
+      <div className={cn('transition-all duration-300', sidebarOpen ? 'lg:ml-64' : 'lg:ml-0')}>
         {/* Header */}
         <motion.header 
           className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-soft"
@@ -282,19 +277,15 @@ const App: React.FC = () => {
                 <h4 className="font-semibold text-slate-900 mb-4">Technology</h4>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-primary-600" />
                     <span>FastAPI Backend</span>
                   </li>
                   <li className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-primary-600" />
                     <span>React + TypeScript</span>
                   </li>
                   <li className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-primary-600" />
                     <span>ChromaDB Vector DB</span>
                   </li>
                   <li className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-primary-600" />
                     <span>Jina Embeddings</span>
                   </li>
                 </ul>

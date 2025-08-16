@@ -8,52 +8,24 @@ import {
   Settings, 
   Brain,
   Sparkles,
-  Zap,
   Database,
-  BarChart3,
-  Menu
+  BarChart3
 } from 'lucide-react';
 import { SidebarProps, NavItem } from '../types';
 import Button from './ui/Button';
 import { cn } from '../utils/cn';
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate, activeId }) => {
   const navItems: NavItem[] = [
-    {
-      id: 'upload',
-      name: 'Upload Documents',
-      icon: Upload,
-      description: 'Upload and process your documents',
-    },
-    {
-      id: 'search',
-      name: 'Search Knowledge Base',
-      icon: Search,
-      description: 'Query your documents with AI',
-    },
-    {
-      id: 'documents',
-      name: 'Manage Documents',
-      icon: FileText,
-      description: 'View and manage your documents',
-    },
-    {
-      id: 'analytics',
-      name: 'Analytics',
-      icon: BarChart3,
-      description: 'View system statistics and insights',
-    },
-    {
-      id: 'settings',
-      name: 'Settings',
-      icon: Settings,
-      description: 'Configure your preferences',
-    },
+    { id: 'upload', name: 'Upload Documents', icon: Upload, description: 'Upload and process your documents' },
+    { id: 'search', name: 'Search Knowledge Base', icon: Search, description: 'Query your documents with AI' },
+    { id: 'documents', name: 'Manage Documents', icon: FileText, description: 'View and manage your documents' },
+    { id: 'analytics', name: 'Analytics', icon: BarChart3, description: 'View system statistics and insights' },
+    { id: 'settings', name: 'Settings', icon: Settings, description: 'Configure your preferences' },
   ];
 
   return (
     <>
-      {/* Mobile Overlay */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -66,17 +38,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
       <motion.aside
-        className={cn(
-          'sidebar',
-          !isOpen && 'sidebar-collapsed'
-        )}
+        className={cn('sidebar', !isOpen && 'sidebar-collapsed')}
         initial={{ x: -256 }}
         animate={{ x: isOpen ? 0 : -256 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/20">
           <div className="flex items-center space-x-3">
             <div className="relative">
@@ -94,43 +61,38 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <p className="text-xs text-slate-500">AI-powered intelligence</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="lg:hidden"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose} className="lg:hidden">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item, index) => {
             const Icon = item.icon;
+            const isActive = activeId === item.id;
             return (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.05 }}
               >
                 <button
-                  className="sidebar-nav-item w-full text-left group"
+                  className={cn('sidebar-nav-item w-full text-left group', isActive && 'sidebar-nav-item-active')}
                   onClick={() => {
-                    // Handle navigation here
-                    console.log(`Navigating to ${item.id}`);
+                    onNavigate(item.id);
+                    onClose();
                   }}
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-slate-100 group-hover:bg-primary-100 rounded-lg transition-colors duration-200">
-                      <Icon className="h-4 w-4 text-slate-600 group-hover:text-primary-600 transition-colors duration-200" />
+                    <div className={cn('p-2 rounded-lg transition-colors duration-200', isActive ? 'bg-primary-100' : 'bg-slate-100 group-hover:bg-primary-100')}>
+                      <Icon className={cn('h-4 w-4 transition-colors duration-200', isActive ? 'text-primary-600' : 'text-slate-600 group-hover:text-primary-600')} />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-slate-900 group-hover:text-primary-700 transition-colors duration-200">
+                      <p className={cn('font-medium transition-colors duration-200', isActive ? 'text-primary-700' : 'text-slate-900 group-hover:text-primary-700')}>
                         {item.name}
                       </p>
-                      <p className="text-xs text-slate-500 group-hover:text-slate-600 transition-colors duration-200">
+                      <p className={cn('text-xs transition-colors duration-200', isActive ? 'text-primary-600' : 'text-slate-500 group-hover:text-slate-600')}>
                         {item.description}
                       </p>
                     </div>
@@ -141,10 +103,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        {/* Footer */}
         <div className="p-4 border-t border-white/20">
           <div className="space-y-3">
-            {/* Quick Stats */}
             <div className="bg-gradient-to-r from-primary-50 to-accent-50 rounded-xl p-3">
               <div className="flex items-center space-x-2 mb-2">
                 <Database className="h-4 w-4 text-primary-600" />
@@ -162,14 +122,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-600">Status</span>
                   <span className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-success-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-success-500 rounded-full" />
                     <span className="text-success-600 font-medium">Online</span>
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Version Info */}
             <div className="text-center">
               <div className="flex items-center justify-center space-x-1 text-xs text-slate-500">
                 <Sparkles className="h-3 w-3" />

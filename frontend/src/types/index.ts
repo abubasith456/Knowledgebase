@@ -151,6 +151,8 @@ export interface DocumentManagerProps {
 export interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigate: (id: string) => void;
+  activeId?: string;
 }
 
 export interface ModalProps {
